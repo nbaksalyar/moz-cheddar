@@ -12,6 +12,22 @@ pub fn rust_to_c(ty: &ast::Ty, assoc: &str) -> Result<Option<String>, Error> {
     match ty.node {
         // Function pointers make life an absolute pain here.
         ast::Ty_::TyBareFn(ref bare_fn) => fn_ptr_to_c(bare_fn, ty.span, assoc),
+        // Special case Options wrapping function pointers.
+        ast::Ty_::TyPath(None, ref path) => {
+            if path.segments.len() == 1 &&
+                path.segments[0].identifier.name.as_str() == "Option" {
+                    if let ast::PathParameters::AngleBracketedParameters(ref d) = path.segments[0].parameters {
+                        assert!(d.lifetimes.is_empty() && d.bindings.is_empty());
+                        if d.types.len() == 1 {
+                            if let ast::Ty_::TyBareFn(ref bare_fn) = d.types[0].node {
+                                return fn_ptr_to_c(bare_fn, ty.span, assoc);
+                            }
+                        }
+                    }
+                }
+
+            Ok(Some(format!("{} {}", try_some!(anon_rust_to_c(ty)), assoc)))
+        }
         // All other types just have a name associated with them.
         _ => Ok(Some(format!("{} {}", try_some!(anon_rust_to_c(ty)), assoc))),
     }
@@ -442,6 +458,12 @@ mod test {
         assert!(parsed_type.is_none(), "parsed a non-C function pointer");
 
         let source = "extern fn(hi: libc::c_int) -> libc::c_double";
+        let parsed_type = super::rust_to_c(&ty(source), name)
+            .expect(&format!("error while parsing {:?} with name {:?}", source, name))
+            .expect(&format!("did not parse {:?} with name {:?}", source, name));
+        assert_eq!(parsed_type, format!("double (*{})(int hi)", name));
+
+        let source = "Option<extern fn(hi: libc::c_int) -> libc::c_double>";
         let parsed_type = super::rust_to_c(&ty(source), name)
             .expect(&format!("error while parsing {:?} with name {:?}", source, name))
             .expect(&format!("did not parse {:?} with name {:?}", source, name));
