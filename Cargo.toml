@@ -22,5 +22,5 @@ doc = false
 
 [dependencies]
 syntex_syntax = "0.24.0"
-toml = "0.1.25"
+toml = "0.3.2"
 clap = "1"
