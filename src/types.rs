@@ -15,12 +15,14 @@ pub fn rust_to_c(ty: &ast::Ty, assoc: &str) -> Result<Option<String>, Error> {
         // Special case Options wrapping function pointers.
         ast::TyKind::Path(None, ref path) => {
             if path.segments.len() == 1 &&
-                path.segments[0].identifier.name.as_str() == "Option" {
-                    if let ast::PathParameters::AngleBracketed(ref d) = path.segments[0].parameters {
-                        assert!(d.lifetimes.is_empty() && d.bindings.is_empty());
-                        if d.types.len() == 1 {
-                            if let ast::TyKind::BareFn(ref bare_fn) = d.types[0].node {
-                                return fn_ptr_to_c(bare_fn, ty.span, assoc);
+                path.segments[0].identifier.name == "Option" {
+                    if let Some(ref param) = path.segments[0].parameters {
+                        if let ast::PathParameters::AngleBracketed(ref d) = **param {
+                            assert!(d.lifetimes.is_empty() && d.bindings.is_empty());
+                            if d.types.len() == 1 {
+                                if let ast::TyKind::BareFn(ref bare_fn) = d.types[0].node {
+                                    return fn_ptr_to_c(bare_fn, ty.span, assoc);
+                                }
                             }
                         }
                     }
@@ -263,7 +265,6 @@ mod test {
         let result = {
             let mut parser = ::syntax::parse::new_parser_from_source_str(
                 &sess,
-                vec![],
                 "".into(),
                 source.into(),
             );
