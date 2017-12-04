@@ -1,16 +1,29 @@
 //! Functions common for all target languages.
 
-use std::path::PathBuf;
+use Error;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use syntax::abi::Abi;
 use syntax::ast;
 use syntax::print::pprust;
-use Error;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FilterMode {
+    Blacklist,
+    Whitelist,
+}
 
 /// Outputs several files as a result of an AST transformation.
 pub type Outputs = HashMap<PathBuf, String>;
 
 /// Target language support
 pub trait Lang {
+    /// Convert a Rust constant (`pub const NAME: Type = value;`) into a target
+    /// language constant.
+    fn parse_const(&mut self, _item: &ast::Item, _outputs: &mut Outputs) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// Convert `pub type A = B;` into `typedef B A;`.
     fn parse_ty(&mut self, _item: &ast::Item, _outputs: &mut Outputs) -> Result<(), Error> {
         Ok(())
@@ -131,5 +144,14 @@ pub fn retrieve_docstring(attr: &ast::Attribute, prepend: &str) -> Option<String
             }
         }
         _ => None,
+    }
+}
+
+/// Returns whether the calling convention of the function is compatible with
+/// C (i.e. `extern "C"`).
+pub fn is_extern(abi: Abi) -> bool {
+    match abi {
+        Abi::C | Abi::Cdecl | Abi::Stdcall | Abi::Fastcall | Abi::System => true,
+        _ => false,
     }
 }
